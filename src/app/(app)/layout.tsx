@@ -3,7 +3,7 @@ import { RequireAuth } from "@/components/app/require-auth";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RequireAuth>
+    <RequireAuth role="employe">
       <AppShell>{children}</AppShell>
     </RequireAuth>
   );
