@@ -9,10 +9,10 @@ setGlobalOptions({ region: "europe-west1", maxInstances: 10 });
 
 const db = getFirestore();
 
-const orgLat = defineString("ORG_LAT", { default: "0" });
-const orgLon = defineString("ORG_LON", { default: "0" });
-const orgRadiusM = defineString("ORG_RADIUS_M", { default: "200" });
-const qrToken = defineString("POINTAGE_QR_TOKEN", { default: "" });
+const orgLat = defineString("ORG_LAT");
+const orgLon = defineString("ORG_LON");
+const orgRadiusM = defineString("ORG_RADIUS_M");
+const qrToken = defineString("POINTAGE_QR_TOKEN");
 
 type PointageType = "entree" | "sortie";
 
@@ -115,10 +115,18 @@ export const createPointage = onCall(async (request) => {
     throw new HttpsError("permission-denied", "Invalid QR token");
   }
 
-  const centerLat = Number(orgLat.value());
-  const centerLon = Number(orgLon.value());
-  const radiusM = Number(orgRadiusM.value());
-  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLon) || !Number.isFinite(radiusM)) {
+  const orgLatRaw = orgLat.value().trim();
+  const orgLonRaw = orgLon.value().trim();
+  const orgRadiusRaw = orgRadiusM.value().trim();
+
+  if (!orgLatRaw || !orgLonRaw || !orgRadiusRaw) {
+    throw new HttpsError("failed-precondition", "ORG_LAT/ORG_LON/ORG_RADIUS_M must be configured on the function");
+  }
+
+  const centerLat = Number(orgLatRaw);
+  const centerLon = Number(orgLonRaw);
+  const radiusM = Number(orgRadiusRaw);
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLon) || !Number.isFinite(radiusM) || radiusM <= 0) {
     throw new HttpsError("failed-precondition", "ORG_LAT/ORG_LON/ORG_RADIUS_M are invalid");
   }
 

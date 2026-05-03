@@ -52,32 +52,6 @@ export async function getUserRole(uid: string): Promise<UserRole | null> {
   return null;
 }
 
-export async function addPointage(docData: Omit<PointageDoc, "createdAt">): Promise<string> {
-  const db = requireDb();
-  const ref = await addDoc(collection(db, "pointages"), {
-    ...docData,
-    createdAt: serverTimestamp(),
-  });
-  return ref.id;
-}
-
-export async function getLatestPointageForUser(uid: string): Promise<(PointageDoc & { id: string }) | null> {
-  const db = requireDb();
-  // Avoid composite index requirement: no orderBy here.
-  const q = query(collection(db, "pointages"), where("userId", "==", uid), limit(200));
-  const snaps = await getDocs(q);
-  const rows = snaps.docs.map((d) => ({ id: d.id, ...(d.data() as PointageDoc) }));
-  if (rows.length === 0) return null;
-
-  // Prefer createdAt when available; fallback to date+heure.
-  const best = rows.reduce((acc, cur) => {
-    const a = unwrapTimestamp((acc as PointageDoc).createdAt)?.getTime() ?? Date.parse(`${acc.date}T${acc.heure}:00`);
-    const b = unwrapTimestamp((cur as PointageDoc).createdAt)?.getTime() ?? Date.parse(`${cur.date}T${cur.heure}:00`);
-    return b >= a ? cur : acc;
-  });
-  return best;
-}
-
 export async function listPointagesForUser(uid: string, take = 50): Promise<Array<PointageDoc & { id: string }>> {
   const db = requireDb();
   // Avoid composite index requirement: no orderBy here; sort client-side.
