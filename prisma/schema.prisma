@@ -1,6 +1,3 @@
-// TimeTrack Pro — Prisma + MongoDB
-// https://www.prisma.io/docs/orm/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,155 +7,78 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// ENUMS POUR LIMITER LES VALEURS AUTORISÉES
+// ==========================================
+
 enum Role {
-  ADMIN
-  EMPLOYEE
+  admin
+  employe
 }
 
-enum LeaveType {
-  ANNUAL
-  SICK
-  EXCEPTIONAL
+enum PointageType {
+  entree
+  sortie
 }
 
-enum LeaveStatus {
-  PENDING
-  APPROVED
-  REJECTED
+enum CongeType {
+  annuel
+  maladie
+  exceptionnel
 }
 
-enum AttendanceKind {
-  CLOCK_IN
-  CLOCK_OUT
+enum CongeStatut {
+  en_attente
+  valide
+  refuse
 }
 
-enum AttendanceMethod {
-  GPS
-  QR_CODE
-  MANUAL
-}
-
-enum AttendanceDayStatus {
-  PRESENT
-  ABSENT
-  LATE
-  EARLY_LEAVE
-  INSUFFICIENT_HOURS
-}
-
-enum NotificationType {
-  INFO
-  SUCCESS
-  WARNING
-  DANGER
-}
+// ==========================================
+// MODÈLES (SCHEMAS)
+// ==========================================
 
 model User {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
-  email           String    @unique
-  emailVerified   DateTime?
-  name            String
-  image           String?
-  passwordHash    String
-  role            Role      @default(EMPLOYEE)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  nom       String
+  email     String     @unique // Validation: Email unique
+  password  String     // Doit être hashé dans la logique métier
+  role      Role
 
-  attendances     Attendance[]
-  leaves          Leave[]    @relation("EmployeeLeaves")
-  reviewedLeaves  Leave[]    @relation("LeaveReviewer")
-  notifications   Notification[]
-  activityLogs    ActivityLog[]
-  qrCodesCreated  QrCode[]
+  // Relations (One-to-Many)
+  pointages Pointage[]
+  conges    Conge[]
 
-  @@index([role])
-  @@index([createdAt])
+  @@map("users") // Nom exact de la collection dans MongoDB
 }
 
-model Attendance {
-  id          String               @id @default(auto()) @map("_id") @db.ObjectId
-  userId      String               @db.ObjectId
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date        DateTime // jour de référence (UTC minuit ou logique métier)
-  kind        AttendanceKind
-  method      AttendanceMethod
-  status      AttendanceDayStatus?
-  occurredAt  DateTime             @default(now())
-  latitude    Float?
-  longitude   Float?
-  accuracyM   Float?
-  qrToken     String?
-  notes       String?
-  createdAt   DateTime             @default(now())
+model Pointage {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Relation avec User
+  user_id   String       @db.ObjectId
+  user      User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([userId, occurredAt])
-  @@index([userId, date])
-  @@index([date])
+  date      String       // Format YYYY-MM-DD
+  heure     String       // Format HH:MM
+  type      PointageType
+  latitude  String?      // Optionnel
+  longitude String?      // Optionnel
+  valide    Boolean?     @default(false) // Validation explicite ou valeur par défaut
+
+  @@map("pointages")
 }
 
-model Leave {
-  id             String       @id @default(auto()) @map("_id") @db.ObjectId
-  userId         String       @db.ObjectId
-  user           User         @relation("EmployeeLeaves", fields: [userId], references: [id], onDelete: Cascade)
-  type           LeaveType
-  status         LeaveStatus  @default(PENDING)
-  startDate      DateTime
-  endDate        DateTime
-  reason         String?
-  reviewedById   String?      @db.ObjectId
-  reviewedBy     User?        @relation("LeaveReviewer", fields: [reviewedById], references: [id])
-  reviewedAt     DateTime?
-  reviewerNote   String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+model Conge {
+  id         String      @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Relation avec User
+  user_id    String      @db.ObjectId
+  user       User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([userId, status])
-  @@index([startDate, endDate])
-}
+  date_debut DateTime
+  date_fin   DateTime
+  type       CongeType
+  statut     CongeStatut @default(en_attente) // Valeur par défaut "en_attente"
 
-model QrCode {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  token       String   @unique
-  dayKey      String // ex. YYYY-MM-DD pour rotation quotidienne
-  validFrom   DateTime
-  validUntil  DateTime
-  isActive    Boolean  @default(true)
-  createdById String?  @db.ObjectId
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-
-  @@index([dayKey])
-  @@index([validFrom, validUntil])
-}
-
-model Notification {
-  id        String           @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String           @db.ObjectId
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String
-  body      String
-  type      NotificationType @default(INFO)
-  read      Boolean          @default(false)
-  link      String?
-  createdAt DateTime         @default(now())
-
-  @@index([userId, read])
-  @@index([createdAt])
-}
-
-model ActivityLog {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String?  @db.ObjectId
-  user      User?    @relation(fields: [userId], references: [id])
-  action    String
-  entity    String?
-  entityId  String?
-  metadata  Json?
-  ip        String?
-  userAgent String?
-  createdAt DateTime @default(now())
-
-  @@index([userId, createdAt])
-  @@index([action])
-  @@index([createdAt])
+  @@map("conges")
 }
