@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, limit, onSnapshot, query } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getFirebaseFirestore } from "@/lib/firebase-firestore";
 import type { UserDoc } from "@/lib/data-model";
@@ -14,12 +15,14 @@ export default function AdminEmployesPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [qtext, setQtext] = useState("");
+  const [view, setView] = useState<"employes" | "tous">("employes");
 
   useEffect(() => {
     const db = getFirebaseFirestore();
     if (!db) return;
 
-    const q = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(200));
+    // Avoid composite index requirements; sort client-side if needed.
+    const q = query(collection(db, "users"), limit(500));
     const unsub = onSnapshot(
       q,
       (snap) => {
@@ -36,23 +39,36 @@ export default function AdminEmployesPage() {
   }, []);
 
   const filtered = useMemo(() => {
+    const base = view === "employes" ? rows.filter((r) => r.role === "employe") : rows;
     const q = qtext.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => `${r.nom} ${r.email} ${r.role}`.toLowerCase().includes(q));
-  }, [rows, qtext]);
+    if (!q) return base;
+    return base.filter((r) => `${r.nom} ${r.email} ${r.role}`.toLowerCase().includes(q));
+  }, [rows, qtext, view]);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Employés</h1>
-        <p className="text-muted-foreground">Liste des comptes (Firestore `users`).</p>
+        <p className="text-muted-foreground">
+          Par défaut, on affiche uniquement les comptes <span className="font-medium">employe</span> (les admins ne sont pas des employés).
+        </p>
       </div>
 
       <Card>
         <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <CardTitle>Comptes</CardTitle>
-            <CardDescription>{loading ? "Chargement..." : `${filtered.length} employé(s)`}</CardDescription>
+            <CardDescription>
+              {loading ? "Chargement..." : `${filtered.length} ligne(s) · vue: ${view === "employes" ? "employés" : "tous"}`}
+            </CardDescription>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button type="button" size="sm" variant={view === "employes" ? "default" : "outline"} onClick={() => setView("employes")}>
+                Employés
+              </Button>
+              <Button type="button" size="sm" variant={view === "tous" ? "default" : "outline"} onClick={() => setView("tous")}>
+                Tous (inclut admin)
+              </Button>
+            </div>
           </div>
           <div className="w-full md:w-80">
             <Input value={qtext} onChange={(e) => setQtext(e.target.value)} placeholder="Rechercher (nom, email…)" />

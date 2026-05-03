@@ -24,11 +24,16 @@ function ymdToTime(ymd: string): number {
   return Date.parse(`${ymd}T00:00:00`);
 }
 
+function formatPointageType(type: PointageDoc["type"]): string {
+  return type === "entree" ? "Entrée" : "Sortie";
+}
+
 export default function AdminRapportPointagePage() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
-  const [employees, setEmployees] = useState<Array<{ id: string; nom: string; email: string }>>([]);
+  const [employees, setEmployees] = useState<Array<{ id: string; nom: string; email: string; role: UserDoc["role"] }>>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
+  const [includeAdminsInPicker, setIncludeAdminsInPicker] = useState(false);
 
   const [filterMode, setFilterMode] = useState<"day" | "range">("day");
   const [employeeId, setEmployeeId] = useState(""); // "" = tous
@@ -54,6 +59,7 @@ export default function AdminRapportPointagePage() {
             id: d.id,
             nom: data.nom ?? "(sans nom)",
             email: data.email ?? "",
+            role: (data.role === "admin" || data.role === "employe" ? data.role : "employe") as UserDoc["role"],
           };
         });
         list.sort((a, b) => a.nom.localeCompare(b.nom));
@@ -65,6 +71,27 @@ export default function AdminRapportPointagePage() {
       }
     })();
   }, []);
+
+  const employeeOptions = useMemo(() => {
+    if (includeAdminsInPicker) return employees;
+    return employees.filter((u) => u.role === "employe");
+  }, [employees, includeAdminsInPicker]);
+
+  const userById = useMemo(() => {
+    const map = new Map<string, { nom: string; email: string; role: UserDoc["role"] }>();
+    for (const u of employees) map.set(u.id, { nom: u.nom, email: u.email, role: u.role });
+    return map;
+  }, [employees]);
+
+  function renderUserCell(uid: string) {
+    const u = userById.get(uid);
+    return (
+      <div className="min-w-[220px] max-w-[360px]" title={u?.email ? `${u.nom} · ${u.email}` : u?.nom ?? ""}>
+        <div className="truncate font-medium">{u?.nom ?? "Utilisateur inconnu"}</div>
+        {u?.email ? <div className="truncate text-xs text-muted-foreground">{u.email}</div> : null}
+      </div>
+    );
+  }
 
   async function load() {
     setLoading(true);
@@ -109,38 +136,46 @@ export default function AdminRapportPointagePage() {
       byUserDate.set(key, arr);
     }
 
-    const result: Array<{ key: string; kind: string; details: string }> = [];
+    const result: Array<{ key: string; userId: string; date: string; kind: string; details: string }> = [];
     for (const [key, arr] of byUserDate.entries()) {
+      const parts = key.split("|");
+      const userId = parts[0] ?? key;
+      const date = parts[1] ?? "";
       const entries = arr.filter((x) => x.type === "entree").sort((a, b) => a.heure.localeCompare(b.heure));
       const exits = arr.filter((x) => x.type === "sortie").sort((a, b) => a.heure.localeCompare(b.heure));
 
       if (entries.length === 0) {
-        result.push({ key, kind: "Absence", details: "Aucune entrée" });
+        result.push({ key, userId, date, kind: "Absence", details: "Aucune entrée" });
         continue;
       }
 
       const firstEntry = entries[0]!;
       if (firstEntry.heure > "09:00") {
-        result.push({ key, kind: "Retard", details: `Entrée à ${firstEntry.heure}` });
+        result.push({ key, userId, date, kind: "Retard", details: `Entrée à ${firstEntry.heure}` });
       }
 
       if (exits.length === 0) {
-        result.push({ key, kind: "Manquement", details: "Aucune sortie" });
+        result.push({ key, userId, date, kind: "Manquement", details: "Aucune sortie" });
         continue;
       }
 
       const lastExit = exits[exits.length - 1]!;
       if (lastExit.heure < "17:00") {
-        result.push({ key, kind: "Sortie anticipée", details: `Sortie à ${lastExit.heure}` });
+        result.push({ key, userId, date, kind: "Sortie anticipée", details: `Sortie à ${lastExit.heure}` });
       }
 
       const h = hoursBetween(firstEntry, lastExit);
       if (h < 8) {
-        result.push({ key, kind: "Insuffisance", details: `${h.toFixed(2)}h (< 8h)` });
+        result.push({ key, userId, date, kind: "Insuffisance", details: `${h.toFixed(2)}h (< 8h)` });
       }
     }
     return result;
   }, [filtered]);
+
+  const selectedEmployee = employeeId ? userById.get(employeeId) : undefined;
+  const selectedEmployeeLabel = selectedEmployee?.email
+    ? `${selectedEmployee.nom} · ${selectedEmployee.email}`
+    : selectedEmployee?.nom;
 
   return (
     <div className="space-y-6">
@@ -167,16 +202,39 @@ export default function AdminRapportPointagePage() {
                 onChange={(e) => setEmployeeId(e.target.value)}
                 disabled={employeesLoading}
               >
-                <option value="">Tous les employés</option>
-                {employees.map((u) => (
+                <option value="">{includeAdminsInPicker ? "Tous les comptes" : "Tous les employés"}</option>
+                {employeeOptions.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.nom} {u.email ? `(${u.email})` : ""}
+                    {u.nom} {u.email ? `(${u.email})` : ""} · {u.role}
                   </option>
                 ))}
               </select>
-              <div className="mt-2 text-xs text-muted-foreground">
-                UID sélectionné: <span className="font-mono">{employeeId || "—"}</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={includeAdminsInPicker ? "default" : "outline"}
+                  onClick={() => {
+                    setIncludeAdminsInPicker((v) => {
+                      const next = !v;
+                      const nextOptions = next ? employees : employees.filter((u) => u.role === "employe");
+                      if (employeeId && !nextOptions.some((u) => u.id === employeeId)) setEmployeeId("");
+                      return next;
+                    });
+                  }}
+                  disabled={employeesLoading}
+                >
+                  {includeAdminsInPicker ? "Inclut admins" : "Employés seulement"}
+                </Button>
               </div>
+              {employeeId ? (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Filtre actif:{" "}
+                  <span className="font-medium">
+                    {selectedEmployeeLabel ?? "Utilisateur"}
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-3">
@@ -234,19 +292,19 @@ export default function AdminRapportPointagePage() {
               <table className="w-full text-sm">
                 <thead className="text-left text-muted-foreground">
                   <tr className="border-b">
-                    <th className="py-2 pr-4">UserId</th>
-                    <th className="py-2 pr-4">Date</th>
-                    <th className="py-2 pr-4">Heure</th>
+                    <th className="py-2 pr-4">Employé</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Date</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Heure</th>
                     <th className="py-2 pr-4">Type</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((r) => (
                     <tr key={r.id} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-mono text-xs">{r.userId}</td>
-                      <td className="py-2 pr-4">{r.date}</td>
-                      <td className="py-2 pr-4">{r.heure}</td>
-                      <td className="py-2 pr-4">{r.type}</td>
+                      <td className="py-2 pr-4 align-top">{renderUserCell(r.userId)}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap align-top">{r.date}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap align-top">{r.heure}</td>
+                      <td className="py-2 pr-4 align-top">{formatPointageType(r.type)}</td>
                     </tr>
                   ))}
                   {!loading && filtered.length === 0 ? (
@@ -272,22 +330,24 @@ export default function AdminRapportPointagePage() {
               <table className="w-full text-sm">
                 <thead className="text-left text-muted-foreground">
                   <tr className="border-b">
-                    <th className="py-2 pr-4">UserId|Date</th>
-                    <th className="py-2 pr-4">Type</th>
+                    <th className="py-2 pr-4">Employé</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Date</th>
+                    <th className="py-2 pr-4">Anomalie</th>
                     <th className="py-2 pr-4">Détails</th>
                   </tr>
                 </thead>
                 <tbody>
                   {anomalies.map((a) => (
                     <tr key={`${a.key}|${a.kind}`} className="border-b last:border-0">
-                      <td className="py-2 pr-4 font-mono text-xs">{a.key}</td>
-                      <td className="py-2 pr-4">{a.kind}</td>
-                      <td className="py-2 pr-4">{a.details}</td>
+                      <td className="py-2 pr-4 align-top">{renderUserCell(a.userId)}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap align-top">{a.date}</td>
+                      <td className="py-2 pr-4 align-top">{a.kind}</td>
+                      <td className="py-2 pr-4 align-top">{a.details}</td>
                     </tr>
                   ))}
                   {!loading && anomalies.length === 0 ? (
                     <tr>
-                      <td className="py-6 text-muted-foreground" colSpan={3}>
+                      <td className="py-6 text-muted-foreground" colSpan={4}>
                         Aucune anomalie détectée.
                       </td>
                     </tr>

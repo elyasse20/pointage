@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
+import { httpsCallable } from "firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/components/providers/auth-provider";
-import { addPointage, getLatestPointageForUser, toHM, toYMD } from "@/lib/firestore-helpers";
+import { getFirebaseFunctions } from "@/lib/firebase-functions";
 import type { PointageType } from "@/lib/data-model";
 
 type Geo = { latitude: number; longitude: number };
@@ -37,17 +38,6 @@ export default function PointagePage() {
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const refreshNextTypeRef = useRef<() => Promise<PointageType>>(async () => "entree");
-
-  useEffect(() => {
-    refreshNextTypeRef.current = async () => {
-      if (!user) return "entree";
-      const latest = await getLatestPointageForUser(user.uid);
-      if (!latest) return "entree";
-      return latest.type === "entree" ? "sortie" : "entree";
-    };
-  }, [user]);
-
   const handleGetGeo = useCallback(async () => {
     try {
       const g = await getCurrentPosition();
@@ -68,36 +58,62 @@ export default function PointagePage() {
     if (!user) return;
     setSaving(true);
     try {
-      const now = new Date();
-      const type = await refreshNextTypeRef.current();
+      const functions = getFirebaseFunctions();
+      if (!functions) {
+        toast.error("Firebase n'est pas configuré");
+        return;
+      }
+
+      const qrToken = process.env.NEXT_PUBLIC_POINTAGE_QR_TOKEN?.trim() ?? "";
+      if (!qrToken) {
+        toast.error("QR token manquant: définissez NEXT_PUBLIC_POINTAGE_QR_TOKEN dans .env.local");
+        return;
+      }
+
+      const scanned = qr.trim();
+      if (!scanned) {
+        toast.error("Scannez le QR code (ou collez le token) avant de pointer");
+        return;
+      }
+
       const g = geo ?? (await getCurrentPosition().catch(() => null));
+      if (!g) {
+        toast.error("La géolocalisation est obligatoire pour pointer");
+        return;
+      }
 
-      await addPointage({
-        userId: user.uid,
-        date: toYMD(now),
-        heure: toHM(now),
-        type,
-        latitude: g?.latitude ?? null,
-        longitude: g?.longitude ?? null,
-        valide: true,
-      });
+      const createPointage = httpsCallable(functions, "createPointage");
+      const res = await createPointage({ latitude: g.latitude, longitude: g.longitude, qr: scanned });
+      const payload = res.data as { type?: PointageType };
 
-      toast.success(type === "entree" ? "Pointage d'entrée enregistré" : "Pointage de sortie enregistré");
+      const type = payload.type;
+      toast.success(type === "sortie" ? "Pointage de sortie enregistré" : "Pointage d'entrée enregistré");
       setQr("");
       setScanning(false);
     } catch (err) {
-      const code = (err as { code?: string })?.code;
-      if (code === "permission-denied") {
-        toast.error("Accès refusé (règles Firestore) أثناء تسجيل الحضور");
-      } else if (code === "failed-precondition") {
-        toast.error("Index Firestore manquant pour la requête (ou Firestore non prêt)");
+      const anyErr = err as { code?: string; message?: string; details?: unknown };
+      const code = anyErr?.code;
+      const msg = typeof anyErr?.message === "string" ? anyErr.message : "";
+
+      if (code === "functions/unauthenticated") {
+        toast.error("Session expirée: reconnectez-vous");
+      } else if (
+        code === "functions/permission-denied" ||
+        msg.toLowerCase().includes("outside allowed area") ||
+        msg.toLowerCase().includes("invalid qr")
+      ) {
+        toast.error("Pointage refusé: zone ou QR invalide");
+      } else if (code === "functions/invalid-argument") {
+        toast.error("Données invalides");
+      } else if (code === "functions/failed-precondition") {
+        toast.error("Configuration serveur incomplète (token/zone).");
       } else {
-        toast.error(`Erreur lors du pointage${code ? ` (${code})` : ""}`);
+        toast.error(msg || "Erreur lors du pointage");
       }
     } finally {
       setSaving(false);
     }
-  }, [geo, user]);
+  }, [geo, user, qr]);
 
   if (!user) return null;
 
@@ -154,7 +170,7 @@ export default function PointagePage() {
 
             <Input value={qr} onChange={(e) => setQr(e.target.value)} placeholder="QR (auto après scan)" />
             <p className="text-xs text-muted-foreground">
-              MVP: le QR n’est pas encore validé côté serveur; il sert de preuve de scan côté UI.
+              Le QR est validé côté serveur (Callable Function) avec le token configuré dans l’environnement.
             </p>
           </CardContent>
         </Card>
