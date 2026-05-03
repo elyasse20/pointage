@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { getFirebaseAuth } from "@/lib/firebase-auth";
+import { getUserRole } from "@/lib/firestore-helpers";
 
 const formSchema = z.object({
   email: z.string().email({
@@ -45,21 +47,27 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      const result = await signIn("credentials", {
-        email: values.email,
-        password: values.password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        toast.error("Email ou mot de passe incorrect");
-      } else {
-        toast.success("Connexion réussie");
-        router.push("/");
-        router.refresh();
+      const auth = getFirebaseAuth();
+      if (!auth) {
+        toast.error("Firebase n'est pas configuré. Vérifiez votre fichier .env.local");
+        return;
       }
+
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      toast.success("Connexion réussie");
+      const uid = auth.currentUser?.uid;
+      const role = uid ? await getUserRole(uid) : null;
+      router.push(role === "admin" ? "/admin/dashboard" : "/pointage");
+      router.refresh();
     } catch (error) {
-      toast.error("Une erreur est survenue lors de la connexion");
+      const message = error instanceof Error ? error.message : "Une erreur est survenue";
+      if (message.includes("auth/invalid-credential") || message.includes("auth/wrong-password")) {
+        toast.error("Email ou mot de passe incorrect");
+      } else if (message.includes("auth/too-many-requests")) {
+        toast.error("Trop de tentatives. Réessayez plus tard.");
+      } else {
+        toast.error("Une erreur est survenue lors de la connexion");
+      }
     } finally {
       setIsLoading(false);
     }

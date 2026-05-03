@@ -45,9 +45,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: error.errors[0].message }, { status: 400 });
     }
     console.error("Erreur d'inscription:", error);
+    const isDev = process.env.NODE_ENV === "development";
     return NextResponse.json(
-      { message: "Une erreur est survenue lors de l'inscription", error: String(error), stack: error?.stack },
-      { status: 500 }
+      {
+        message: "Une erreur est survenue lors de l'inscription",
+        ...(isDev ? { error: String(error), stack: (error as Error | undefined)?.stack } : null),
+      },
+      { status: 500 },
     );
   }
 }

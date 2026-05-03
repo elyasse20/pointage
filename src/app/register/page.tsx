@@ -6,6 +6,7 @@ import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { getFirebaseAuth } from "@/lib/firebase-auth";
+import { ensureUserDoc } from "@/lib/firestore-helpers";
 
 const formSchema = z.object({
   nom: z.string().min(2, {
@@ -48,25 +51,34 @@ export default function RegisterPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.message || "Une erreur est survenue");
+      const auth = getFirebaseAuth();
+      if (!auth) {
+        toast.error("Firebase n'est pas configuré. Vérifiez votre fichier .env.local");
         return;
       }
 
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      await updateProfile(userCredential.user, { displayName: values.nom });
+      await ensureUserDoc({
+        uid: userCredential.user.uid,
+        nom: values.nom,
+        email: values.email,
+        role: "employe",
+      });
+
       toast.success("Compte créé avec succès !");
-      router.push("/login");
+      router.push("/pointage");
     } catch (error) {
-      toast.error("Erreur de connexion au serveur");
+      const message = error instanceof Error ? error.message : "Une erreur est survenue";
+      if (message.includes("auth/email-already-in-use")) {
+        toast.error("Cet email est déjà utilisé");
+      } else if (message.includes("auth/invalid-email")) {
+        toast.error("Email invalide");
+      } else if (message.includes("auth/weak-password")) {
+        toast.error("Mot de passe trop faible");
+      } else {
+        toast.error("Une erreur est survenue lors de l'inscription");
+      }
     } finally {
       setIsLoading(false);
     }

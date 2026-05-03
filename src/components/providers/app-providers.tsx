@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
+import { initFirebaseAnalytics } from "@/lib/firebase";
+import { AuthProvider } from "@/components/providers/auth-provider";
+
+const ReactQueryDevtools = dynamic(
+  async () => (await import("@tanstack/react-query-devtools")).ReactQueryDevtools,
+  { ssr: false },
+);
 
 type AppProvidersProps = {
   children: React.ReactNode;
@@ -23,12 +30,18 @@ export function AppProviders({ children }: AppProvidersProps) {
       }),
   );
 
+  useEffect(() => {
+    void initFirebaseAnalytics();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-        {children}
-        <Toaster richColors position="top-right" closeButton />
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {children}
+          <Toaster richColors position="top-right" closeButton />
+        </ThemeProvider>
+      </AuthProvider>
       {process.env.NODE_ENV === "development" ? <ReactQueryDevtools buttonPosition="bottom-left" /> : null}
     </QueryClientProvider>
   );
