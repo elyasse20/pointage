@@ -28,7 +28,7 @@ export default function AdminRapportPointagePage() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [employees, setEmployees] = useState<Array<{ id: string; nom: string; email: string }>>([]);
-  const [employeesLoading, setEmployeesLoading] = useState(true);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
 
   const [filterMode, setFilterMode] = useState<"day" | "range">("day");
   const [employeeId, setEmployeeId] = useState(""); // "" = tous
@@ -39,10 +39,11 @@ export default function AdminRapportPointagePage() {
   useEffect(() => {
     const db = getFirebaseFirestore();
     if (!db) {
-      setEmployeesLoading(false);
+      queueMicrotask(() => setEmployeesLoading(false));
       return;
     }
 
+    queueMicrotask(() => setEmployeesLoading(true));
     void (async () => {
       try {
         const q = query(collection(db, "users"), limit(500));
