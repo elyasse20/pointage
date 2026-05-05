@@ -25,10 +25,13 @@ export type CongeStatut = "en_attente" | "valide" | "refuse";
 
 export type CongeDoc = {
   userId: string;
+  employeNom?: string; // Facilite l'affichage côté Admin
   dateDebut: string; // YYYY-MM-DD
   dateFin: string; // YYYY-MM-DD
   type: CongeType;
   statut: CongeStatut;
+  motif?: string; // Justification de l'employé
+  motifRefus?: string; // Explication de l'admin en cas de refus
   createdAt?: unknown;
 };
 

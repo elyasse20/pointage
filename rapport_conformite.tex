@@ -1,0 +1,519 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{pifont}
+\usepackage{multirow}
+\usepackage{colortbl}
+
+\geometry{margin=2.5cm}
+
+% Colors
+\definecolor{vert}{RGB}{34,139,34}
+\definecolor{rouge}{RGB}{180,30,30}
+\definecolor{orange}{RGB}{220,120,0}
+\definecolor{bleu}{RGB}{30,80,180}
+\definecolor{grislight}{RGB}{245,245,245}
+\definecolor{headerblue}{RGB}{20,60,130}
+
+% Checkmarks
+\newcommand{\cmark}{\textcolor{vert}{\ding{51}}}
+\newcommand{\xmark}{\textcolor{rouge}{\ding{55}}}
+\newcommand{\pmark}{\textcolor{orange}{\ding{115}}}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=bleu,
+    urlcolor=bleu,
+    pdftitle={Rapport de Conformite PFA},
+    pdfauthor={Rapport automatique}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{headerblue}{\textbf{TimeTrack Pro — Rapport de Conformité}}}
+\fancyhead[R]{\textcolor{gray}{\small\today}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\large\bfseries\color{headerblue}}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries\color{bleu}}{}{0em}{}
+
+\begin{document}
+
+%-------------------------------------------------------
+% PAGE DE GARDE
+%-------------------------------------------------------
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\Huge\bfseries\color{headerblue} Rapport de Conformité}\\[0.5cm]
+{\Large\color{bleu} Projet de Fin d'Année (PFA)}\\[1cm]
+\rule{\textwidth}{1.5pt}\\[0.5cm]
+{\LARGE\bfseries Application de Gestion du Pointage\\Numérique des Employés}\\[0.5cm]
+\rule{\textwidth}{1.5pt}\\[2cm]
+
+\begin{tcolorbox}[colback=grislight, colframe=headerblue, width=0.85\textwidth]
+\centering
+\textbf{Objet :} Vérification de la conformité du projet \textit{TimeTrack Pro}\\
+par rapport au Cahier des Charges PFA Frontend
+\end{tcolorbox}
+
+\vspace{2cm}
+\begin{tabular}{ll}
+\textbf{Projet} & TimeTrack Pro \\
+\textbf{Framework} & Next.js 16.2.4 (App Router, Turbopack) \\
+\textbf{Base de données} & MongoDB (via Prisma + Firebase Firestore) \\
+\textbf{Authentification} & Firebase Authentication + JWT \\
+\textbf{Date du rapport} & \today \\
+\end{tabular}
+
+\vspace{2cm}
+\begin{tabular}{ccc}
+\cmark~\textcolor{vert}{Conforme} & \pmark~\textcolor{orange}{Partiel} & \xmark~\textcolor{rouge}{Non conforme}
+\end{tabular}
+\end{titlepage}
+
+%-------------------------------------------------------
+% TABLE DES MATIERES
+%-------------------------------------------------------
+\tableofcontents
+\newpage
+
+%-------------------------------------------------------
+% 1. INTRODUCTION
+%-------------------------------------------------------
+\section{Introduction}
+
+Ce rapport analyse la conformité du projet \textbf{TimeTrack Pro} au regard du cahier des charges PFA Frontend fourni. Le projet a pour vocation de développer une application web complète de gestion de pointage numérique des employés, incluant un système de QR code sécurisé, la géolocalisation, la gestion des congés et un tableau de bord analytique.
+
+L'analyse a été conduite par inspection directe du code source disponible dans le dépôt, en comparant chaque exigence du cahier des charges à son implémentation effective.
+
+\begin{tcolorbox}[colback=grislight, colframe=bleu, title=\textbf{Légende}]
+\cmark~\textbf{Conforme} : La fonctionnalité est entièrement implémentée et fonctionnelle.\\
+\pmark~\textbf{Partiel} : La fonctionnalité est partiellement implémentée ou présente des lacunes mineures.\\
+\xmark~\textbf{Non conforme} : La fonctionnalité est absente ou non fonctionnelle.
+\end{tcolorbox}
+
+%-------------------------------------------------------
+% 2. ARCHITECTURE TECHNIQUE
+%-------------------------------------------------------
+\section{Architecture Technique}
+
+\subsection{Exigences du cahier des charges}
+
+\begin{itemize}
+    \item \textbf{Frontend} : React ou Next.js (Axios/Fetch, Recharts, Bootstrap/Material UI)
+    \item \textbf{Backend} : Node.js/Express ou Next.js
+    \item \textbf{Base de données} : MongoDB
+    \item \textbf{API} : REST API (JSON)
+\end{itemize}
+
+\subsection{Tableau de conformité — Architecture}
+
+\begin{longtable}{p{5.5cm} p{6cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Exigence}} & \textcolor{white}{\textbf{Implémentation}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Framework Next.js & Next.js 16.2.4 avec App Router et Turbopack & \cmark \\
+\midrule
+Fetch/Axios & API native \texttt{fetch()} utilisée dans tous les composants & \cmark \\
+\midrule
+Recharts & Recharts v3.8.1 intégré (graphiques présence) & \cmark \\
+\midrule
+UI Library & Shadcn/UI + Radix UI + Tailwind CSS (remplace Bootstrap/MUI) & \cmark \\
+\midrule
+Backend Node.js/Next.js & API Routes Next.js (\texttt{/api/*}) avec Route Handlers & \cmark \\
+\midrule
+Base de données MongoDB & MongoDB via Prisma (schéma défini) + Firebase Firestore & \cmark \\
+\midrule
+REST API JSON & Routes : \texttt{/api/pointage}, \texttt{/api/conges}, \texttt{/api/admin/*} & \cmark \\
+\bottomrule
+\end{longtable}
+
+\textbf{Observation :} L'architecture est entièrement conforme. Le projet utilise Next.js en mode full-stack (frontend + API routes), ce qui est une des options explicitement autorisées par le cahier des charges. Le choix de Shadcn/UI au lieu de Bootstrap est justifié car le CDC mentionne « Bootstrap / Material UI » à titre indicatif.
+
+%-------------------------------------------------------
+% 3. MODELE DE DONNEES
+%-------------------------------------------------------
+\section{Modélisation des Données (MongoDB)}
+
+\subsection{Collections exigées vs implémentées}
+
+\begin{longtable}{p{2.5cm} p{5cm} p{5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Collection}} & \textcolor{white}{\textbf{Champs requis (CDC)}} & \textcolor{white}{\textbf{Champs implémentés}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+\texttt{users} & \_id, nom, email, password, role & Tous présents + relations Prisma & \cmark \\
+\midrule
+\texttt{pointages} & \_id, user\_id, date, heure, type, latitude, longitude, valide & Tous présents. Firestore ajoute \texttt{timestamp}, \texttt{status}, \texttt{notes} & \cmark \\
+\midrule
+\texttt{conges} & \_id, user\_id, date\_debut, date\_fin, type, statut & Tous présents. Types : annuel, maladie, exceptionnel & \cmark \\
+\bottomrule
+\end{longtable}
+
+\textbf{Observation :} Le schéma Prisma (\texttt{prisma/schema.prisma}) reflète fidèlement les collections et champs décrits dans le CDC. Les enums \texttt{Role}, \texttt{PointageType}, \texttt{CongeType}, \texttt{CongeStatut} ajoutent une contrainte de validation supplémentaire non exigée mais bienvenue.
+
+%-------------------------------------------------------
+% 4. FONCTIONNALITES PRINCIPALES
+%-------------------------------------------------------
+\section{Fonctionnalités Principales}
+
+\subsection{4.1 — Authentification}
+
+\begin{longtable}{p{5.5cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Exigence}} & \textcolor{white}{\textbf{Implémentation}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Connexion email + mot de passe & Page \texttt{/login} avec Firebase Authentication & \cmark \\
+\midrule
+Inscription utilisateur & Route \texttt{/api/auth/register} + page \texttt{/register} & \cmark \\
+\midrule
+Gestion des rôles (admin/employé) & Champ \texttt{role} dans Prisma + hook \texttt{useAuth()} exposant le rôle & \cmark \\
+\midrule
+Session / JWT & Firebase ID Token (JWT) transmis dans header \texttt{Authorization: Bearer} & \cmark \\
+\midrule
+Protection des routes & Middleware Next.js (\texttt{auth.ts}) + vérification côté API & \cmark \\
+\bottomrule
+\end{longtable}
+
+\subsection{4.2 — Pointage Intelligent (QR Code + GPS)}
+
+\begin{longtable}{p{5.5cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Exigence}} & \textcolor{white}{\textbf{Implémentation}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Récupération géolocalisation GPS & Hook \texttt{useGeolocation()} dans \texttt{/src/hooks/} & \cmark \\
+\midrule
+Vérification zone autorisée (geofencing) & Formule Haversine dans \texttt{/api/pointage/route.ts}, rayon 100m & \cmark \\
+\midrule
+Scan du QR Code & Composant \texttt{ScannerQR.tsx} (html5-qrcode v2.3.8) & \cmark \\
+\midrule
+QR Code sécurisé (JWT) & Génération JWT dans \texttt{/api/admin/qr-generate}, vérification serveur & \cmark \\
+\midrule
+QR Code changeant (rotation) & Token avec expiration courte, régénérable par l'admin & \cmark \\
+\midrule
+Enregistrement du pointage & \texttt{POST /api/pointage} → Firebase Firestore & \cmark \\
+\midrule
+Type entrée / sortie auto & Logique alternance dans l'API (dernier pointage du jour) & \cmark \\
+\midrule
+Détection retard & Comparaison heure réelle vs 09h00, tolérance 15min & \cmark \\
+\midrule
+Données : user, date, heure, localisation, type & Tous enregistrés dans Firestore avec \texttt{serverTimestamp()} & \cmark \\
+\bottomrule
+\end{longtable}
+
+\subsection{4.3 — Gestion des Congés}
+
+\begin{longtable}{p{5.5cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Exigence}} & \textcolor{white}{\textbf{Implémentation}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Demande de congé (employé) & Page \texttt{/conges} dans espace employé & \cmark \\
+\midrule
+Validation / refus (admin) & Page \texttt{/admin/conges} avec Dialog de modération & \cmark \\
+\midrule
+Type : Congé annuel & Enum \texttt{annuel} dans Prisma + filtre frontend & \cmark \\
+\midrule
+Type : Maladie & Enum \texttt{maladie} dans Prisma & \cmark \\
+\midrule
+Type : Exceptionnel & Enum \texttt{exceptionnel} dans Prisma & \cmark \\
+\midrule
+Statuts : en\_attente, validé, refusé & Enum \texttt{CongeStatut} implémenté & \cmark \\
+\midrule
+Motif de refus (commentaire admin) & Composant \texttt{Textarea} dans Dialog admin & \cmark \\
+\bottomrule
+\end{longtable}
+
+\subsection{4.4 — Tableau de Bord Analytique}
+
+\begin{longtable}{p{5.5cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Indicateur requis}} & \textcolor{white}{\textbf{Implémentation}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Heures travaillées & KPI calculé dans \texttt{/api/admin/stats} & \cmark \\
+\midrule
+Retards & KPI \texttt{retardsToday} affiché en card orange & \cmark \\
+\midrule
+Absences & KPI \texttt{absentsToday} affiché en card rouge & \cmark \\
+\midrule
+Congés en cours & KPI \texttt{congesToday} affiché en card violette & \cmark \\
+\midrule
+Taux de présence & Graphique AreaChart (Recharts) sur 7 jours & \cmark \\
+\midrule
+Anomalies récentes & Liste des retards du jour dans le dashboard & \cmark \\
+\midrule
+Total employés & KPI \texttt{totalEmployes} affiché en card bleue & \cmark \\
+\bottomrule
+\end{longtable}
+
+\subsection{4.5 — Filtres Avancés}
+
+\begin{longtable}{p{5.5cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Exigence}} & \textcolor{white}{\textbf{Implémentation}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Filtre par jour & Route \texttt{GET /api/pointage?date=...} supportée & \cmark \\
+\midrule
+Filtre par mois & Disponible dans \texttt{/api/admin/rapports} & \cmark \\
+\midrule
+Filtre par année & Disponible dans \texttt{/api/admin/rapports} & \cmark \\
+\midrule
+Filtre par employé & Disponible dans \texttt{/api/admin/rapports} & \cmark \\
+\bottomrule
+\end{longtable}
+
+\subsection{4.6 — Détection des Anomalies}
+
+\begin{longtable}{p{5.5cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Anomalie exigée}} & \textcolor{white}{\textbf{Implémentation}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Retard & Détecté à l'enregistrement si pointage $>$ 09h15 & \cmark \\
+\midrule
+Absence & Calculée dans les stats (aucun pointage le jour J) & \cmark \\
+\midrule
+Sortie anticipée & \textcolor{orange}{Non explicitement détectée dans le code analysé} & \pmark \\
+\midrule
+Heures $<$ seuil (8h/jour) & \textcolor{orange}{Calcul de durée non implémenté côté rapport} & \pmark \\
+\bottomrule
+\end{longtable}
+
+%-------------------------------------------------------
+% 5. API
+%-------------------------------------------------------
+\section{Routes API}
+
+\begin{longtable}{p{2.5cm} p{4.5cm} p{4.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Méthode}} & \textcolor{white}{\textbf{Route CDC}} & \textcolor{white}{\textbf{Route implémentée}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+POST & /login & Firebase Auth + session cookie & \cmark \\
+\midrule
+POST & /register & \texttt{/api/auth/register} & \cmark \\
+\midrule
+POST & /pointage & \texttt{/api/pointage} & \cmark \\
+\midrule
+GET & /pointage?date=... & \texttt{/api/pointage} (query params) & \cmark \\
+\midrule
+POST & /conge & \texttt{/api/conges} & \cmark \\
+\midrule
+PUT & /conge/:id & \texttt{/api/admin/conges} (PATCH) & \cmark \\
+\midrule
+GET & /stats & \texttt{/api/admin/stats} & \cmark \\
+\midrule
+— & — & \texttt{/api/admin/employes} (bonus) & \cmark \\
+\midrule
+— & — & \texttt{/api/admin/rapports} (bonus) & \cmark \\
+\midrule
+— & — & \texttt{/api/admin/qr-generate} (bonus) & \cmark \\
+\bottomrule
+\end{longtable}
+
+%-------------------------------------------------------
+% 6. INTERFACES FRONTEND
+%-------------------------------------------------------
+\section{Interfaces Frontend}
+
+\subsection{Espace Employé}
+
+\begin{longtable}{p{4cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Interface requise}} & \textcolor{white}{\textbf{Route / Composant}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Login & \texttt{/login} — Firebase Auth & \cmark \\
+\midrule
+Scanner QR + Bouton Pointer & \texttt{/pointage} — ScannerQR.tsx + GPS & \cmark \\
+\midrule
+Historique personnel & \texttt{/historique} & \cmark \\
+\midrule
+Demande de congé & \texttt{/conges} & \cmark \\
+\bottomrule
+\end{longtable}
+
+\subsection{Espace Administrateur}
+
+\begin{longtable}{p{4cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Interface requise}} & \textcolor{white}{\textbf{Route / Composant}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Dashboard & \texttt{/admin/dashboard} — KPIs + Recharts & \cmark \\
+\midrule
+Liste des employés & \texttt{/admin/employes} & \cmark \\
+\midrule
+Gestion des congés & \texttt{/admin/conges} — Dialog validation & \cmark \\
+\midrule
+Rapport de pointage & \texttt{/admin/rapport-pointage} & \cmark \\
+\midrule
+Filtres avancés & Intégrés dans les pages rapports & \cmark \\
+\midrule
+Génération QR Code & \texttt{/admin/qrcode} & \cmark \\
+\bottomrule
+\end{longtable}
+
+%-------------------------------------------------------
+% 7. SECURITE
+%-------------------------------------------------------
+\section{Sécurité}
+
+\begin{longtable}{p{5cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Exigence de sécurité}} & \textcolor{white}{\textbf{Implémentation}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+JWT Authentication & Firebase ID Token (JWT) vérifié côté serveur via \texttt{adminAuth.verifyIdToken()} & \cmark \\
+\midrule
+Vérification GPS & Formule Haversine, rayon 100m, configurable en \texttt{.env} & \cmark \\
+\midrule
+QR Code dynamique & Token JWT courte durée, généré côté serveur & \cmark \\
+\midrule
+Validation backend obligatoire & Toute logique critique dans les API Routes & \cmark \\
+\midrule
+Protection API & Header \texttt{Authorization: Bearer} requis sur toutes les routes sensibles & \cmark \\
+\midrule
+Hachage mot de passe & bcryptjs intégré dans \texttt{/api/auth/register} & \cmark \\
+\bottomrule
+\end{longtable}
+
+%-------------------------------------------------------
+% 8. CONTRAINTES TECHNIQUES
+%-------------------------------------------------------
+\section{Contraintes Techniques}
+
+\begin{longtable}{p{5cm} p{5.5cm} c}
+\toprule
+\rowcolor{headerblue}
+\textcolor{white}{\textbf{Contrainte}} & \textcolor{white}{\textbf{État}} & \textcolor{white}{\textbf{Statut}} \\
+\midrule
+\endhead
+Responsive design (mobile) & Tailwind CSS avec classes responsive (\texttt{md:}, \texttt{lg:}) & \cmark \\
+\midrule
+Temps réel (WebSocket option) & Socket.io v4.8.3 installé mais non intégré dans les vues & \pmark \\
+\midrule
+Performance API & Turbopack activé, routes optimisées & \cmark \\
+\midrule
+Données sécurisées & Variables d'environnement \texttt{.env}, secrets non exposés & \cmark \\
+\bottomrule
+\end{longtable}
+
+%-------------------------------------------------------
+% 9. SYNTHESE
+%-------------------------------------------------------
+\section{Synthèse de Conformité}
+
+\begin{tcolorbox}[colback=grislight, colframe=headerblue, title=\textbf{Tableau récapitulatif global}]
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Domaine} & \textbf{Conformes} & \textbf{Partiel/Absent} \\
+\midrule
+Architecture technique & 7/7 & 0 \\
+Modélisation données & 3/3 & 0 \\
+Authentification & 5/5 & 0 \\
+Pointage QR + GPS & 9/9 & 0 \\
+Gestion des congés & 7/7 & 0 \\
+Tableau de bord & 7/7 & 0 \\
+Filtres avancés & 4/4 & 0 \\
+Anomalies & 2/4 & 2 \\
+API Routes & 7/7 & 0 \\
+Interfaces Frontend & 10/10 & 0 \\
+Sécurité & 6/6 & 0 \\
+Contraintes techniques & 3/4 & 1 \\
+\midrule
+\textbf{Total} & \textbf{70/73} & \textbf{3} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{tcolorbox}
+
+\vspace{0.5cm}
+\begin{tcolorbox}[colback=green!8, colframe=vert, title=\textbf{\cmark~Taux de conformité global : 95.9\%}]
+Le projet \textbf{TimeTrack Pro} est très largement conforme au cahier des charges. La quasi-totalité des fonctionnalités exigées est implémentée avec une qualité technique élevée. Trois points restent partiellement traités.
+\end{tcolorbox}
+
+%-------------------------------------------------------
+% 10. POINTS PARTIELLEMENT CONFORMES
+%-------------------------------------------------------
+\section{Points Partiellement Conformes}
+
+\subsection{Détection de la sortie anticipée}
+\textbf{Exigence :} Détecter quand un employé quitte avant l'heure prévue.\\
+\textbf{État :} La logique d'alternance entrée/sortie est en place, mais aucune comparaison avec une heure de fin de journée (ex : 17h00) n'est effectuée côté API.\\
+\textbf{Recommandation :} Ajouter dans \texttt{/api/pointage/route.ts}, lors du traitement d'un pointage de type "Sortie", une vérification si l'heure est inférieure à l'heure de fin configurée.
+
+\subsection{Insuffisance d'heures ($<$ 8h/jour)}
+\textbf{Exigence :} Détecter si un employé a travaillé moins de 8h dans la journée.\\
+\textbf{État :} La page de rapport existe, mais le calcul de durée totale (différence entre heure d'entrée et heure de sortie) n'est pas exposé dans les statistiques.\\
+\textbf{Recommandation :} Implémenter dans \texttt{/api/admin/rapports} le calcul de la durée de présence par employé par jour, avec alerte si $<$ 8 heures.
+
+\subsection{Temps réel (WebSocket)}
+\textbf{Exigence :} Le CDC mentionne le temps réel via WebSocket comme option.\\
+\textbf{État :} Socket.io est déclaré dans \texttt{package.json} et installé, mais aucune intégration dans les pages n'est visible.\\
+\textbf{Recommandation :} Connecter le serveur Socket.io aux pages admin/dashboard pour des mises à jour en temps réel des pointages.
+
+%-------------------------------------------------------
+% 11. POINTS FORTS
+%-------------------------------------------------------
+\section{Points Forts du Projet}
+
+\begin{itemize}[leftmargin=*, label=\cmark]
+    \item \textbf{Architecture full-stack moderne} : Next.js 16 avec App Router, séparation claire des routes admin/employé via les Route Groups \texttt{(admin)} et \texttt{(app)}.
+    \item \textbf{Sécurité robuste} : Double sécurité QR Code (JWT signé) + Geofencing Haversine, vérification Firebase Admin SDK côté serveur sur toutes les routes.
+    \item \textbf{Modèle de données complet} : Schéma Prisma avec enums stricts, correspondant exactement aux collections MongoDB spécifiées dans le CDC.
+    \item \textbf{Composants UI de qualité} : Shadcn/UI + Radix UI pour une interface accessible et cohérente, Recharts pour des graphiques analytiques.
+    \item \textbf{Gestion des états} : Zustand pour le state management global, React Query pour le caching des données serveur.
+    \item \textbf{Fonctionnalités bonus} : Génération de QR Code admin (\texttt{/admin/qrcode}), rapport avancé (\texttt{/admin/rapports}), export données.
+    \item \textbf{Authentification Firebase} : Solution enterprise-grade avec gestion des sessions, tokens rafraîchissables automatiquement.
+\end{itemize}
+
+%-------------------------------------------------------
+% 12. CONCLUSION
+%-------------------------------------------------------
+\section{Conclusion}
+
+Le projet \textbf{TimeTrack Pro} répond à \textbf{95.9\%} des exigences formulées dans le cahier des charges PFA Frontend. L'équipe a livré une solution full-stack moderne, sécurisée et fonctionnelle couvrant l'intégralité des cas d'usage principaux : authentification avec gestion des rôles, pointage intelligent par QR Code JWT et géolocalisation, gestion complète des congés avec workflow d'approbation, et tableau de bord analytique avec indicateurs clés de présence.
+
+Les trois points de non-conformité partielle (sortie anticipée, calcul heures insuffisantes, WebSocket) sont de nature mineure et représentent des évolutions naturelles de la V1, facilement implémentables dans le code existant.
+
+\vspace{1cm}
+\begin{tcolorbox}[colback=green!8, colframe=vert]
+\centering
+\textbf{Verdict final : Projet CONFORME au Cahier des Charges}\\
+\small Taux de conformité : \textbf{95.9\%} — Recommandé pour soutenance
+\end{tcolorbox}
+
+\end{document}

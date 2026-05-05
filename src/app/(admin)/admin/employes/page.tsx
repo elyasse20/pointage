@@ -1,110 +1,180 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { collection, limit, onSnapshot, query } from "firebase/firestore";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { getFirebaseFirestore } from "@/lib/firebase-firestore";
-import type { UserDoc } from "@/lib/data-model";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/components/providers/auth-provider";
+import { getFirebaseAuth } from "@/lib/firebase-auth";
+import { Users, Shield, User, Edit } from "lucide-react";
 
-type Row = UserDoc & { id: string };
+type Employe = {
+  id: string;
+  nom: string;
+  email: string;
+  role: "admin" | "employe";
+  createdAt: string;
+};
 
 export default function AdminEmployesPage() {
-  const [rows, setRows] = useState<Row[]>([]);
+  const { user, role } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [qtext, setQtext] = useState("");
-  const [view, setView] = useState<"employes" | "tous">("employes");
+  const [employes, setEmployes] = useState<Employe[]>([]);
 
   useEffect(() => {
-    const db = getFirebaseFirestore();
-    if (!db) return;
+    if (!user || role !== "admin") return;
+    fetchEmployes();
+  }, [user, role]);
 
-    // Avoid composite index requirements; sort client-side if needed.
-    const q = query(collection(db, "users"), limit(500));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setRows(snap.docs.map((d) => ({ id: d.id, ...(d.data() as UserDoc) })));
-        setLoading(false);
-      },
-      () => {
-        toast.error("Impossible de charger les employés");
-        setLoading(false);
-      },
-    );
+  const fetchEmployes = async () => {
+    try {
+      setLoading(true);
+      const auth = getFirebaseAuth();
+      const idToken = await auth?.currentUser?.getIdToken();
+      if (!idToken) return;
 
-    return () => unsub();
-  }, []);
+      const res = await fetch("/api/admin/employes", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEmployes(data.data);
+      } else {
+        toast.error(data.error || "Erreur lors du chargement des employés.");
+      }
+    } catch (err) {
+      toast.error("Impossible de récupérer la liste.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const filtered = useMemo(() => {
-    const base = view === "employes" ? rows.filter((r) => r.role === "employe") : rows;
-    const q = qtext.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((r) => `${r.nom} ${r.email} ${r.role}`.toLowerCase().includes(q));
-  }, [rows, qtext, view]);
+  const handleRoleChange = async (employeId: string, currentRole: string) => {
+    const newRole = currentRole === "admin" ? "employe" : "admin";
+    
+    if (!confirm(`Voulez-vous vraiment changer le rôle de cet utilisateur en ${newRole.toUpperCase()} ?`)) {
+      return;
+    }
+
+    try {
+      const auth = getFirebaseAuth();
+      const idToken = await auth?.currentUser?.getIdToken();
+      if (!idToken) return;
+
+      const res = await fetch("/api/admin/employes", {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}` 
+        },
+        body: JSON.stringify({ employeId, newRole }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message);
+        // Mettre à jour la liste localement
+        setEmployes(employes.map(emp => emp.id === employeId ? { ...emp, role: newRole as any } : emp));
+      } else {
+        toast.error(data.error || "Erreur lors de la modification.");
+      }
+    } catch (err) {
+      toast.error("Erreur serveur.");
+    }
+  };
+
+  if (!user || role !== "admin") return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Employés</h1>
-        <p className="text-muted-foreground">
-          Par défaut, on affiche uniquement les comptes <span className="font-medium">employe</span> (les admins ne sont pas des employés).
+        <h1 className="text-3xl font-bold tracking-tight">Liste des Employés</h1>
+        <p className="text-muted-foreground mt-2">
+          Gérez le personnel et leurs droits d'accès à la plateforme.
         </p>
       </div>
 
-      <Card>
-        <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <CardTitle>Comptes</CardTitle>
-            <CardDescription>
-              {loading ? "Chargement..." : `${filtered.length} ligne(s) · vue: ${view === "employes" ? "employés" : "tous"}`}
-            </CardDescription>
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button type="button" size="sm" variant={view === "employes" ? "default" : "outline"} onClick={() => setView("employes")}>
-                Employés
-              </Button>
-              <Button type="button" size="sm" variant={view === "tous" ? "default" : "outline"} onClick={() => setView("tous")}>
-                Tous (inclut admin)
-              </Button>
-            </div>
-          </div>
-          <div className="w-full md:w-80">
-            <Input value={qtext} onChange={(e) => setQtext(e.target.value)} placeholder="Rechercher (nom, email…)" />
-          </div>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
+            Personnel ({employes.length})
+          </CardTitle>
+          <CardDescription>Tous les utilisateurs enregistrés dans le système.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted-foreground">
-                <tr className="border-b">
-                  <th className="py-2 pr-4">Nom</th>
-                  <th className="py-2 pr-4">Email</th>
-                  <th className="py-2 pr-4">Rôle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => (
-                  <tr key={r.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4">{r.nom}</td>
-                    <td className="py-2 pr-4">{r.email}</td>
-                    <td className="py-2 pr-4">{r.role}</td>
+        <CardContent className="p-0">
+          <div className="rounded-md border-0">
+            <div className="relative w-full overflow-auto">
+              <table className="w-full caption-bottom text-sm">
+                <thead className="[&_tr]:border-b">
+                  <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted bg-muted/30">
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Nom Complet</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Email</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rôle actuel</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Inscrit le</th>
+                    <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Actions</th>
                   </tr>
-                ))}
-                {!loading && filtered.length === 0 ? (
-                  <tr>
-                    <td className="py-6 text-muted-foreground" colSpan={3}>
-                      Aucun résultat.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="[&_tr:last-child]:border-0">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        <div className="flex justify-center items-center gap-2">
+                          <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
+                          Chargement du personnel...
+                        </div>
+                      </td>
+                    </tr>
+                  ) : employes.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        Aucun employé trouvé.
+                      </td>
+                    </tr>
+                  ) : (
+                    employes.map((emp) => (
+                      <tr key={emp.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                        <td className="p-4 align-middle font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                              {emp.nom ? emp.nom.substring(0, 2).toUpperCase() : '?'}
+                            </div>
+                            {emp.nom || 'Inconnu'}
+                          </div>
+                        </td>
+                        <td className="p-4 align-middle">{emp.email}</td>
+                        <td className="p-4 align-middle">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                            emp.role === 'admin' 
+                              ? 'bg-purple-100 text-purple-700 border border-purple-200' 
+                              : 'bg-blue-100 text-blue-700 border border-blue-200'
+                          }`}>
+                            {emp.role === 'admin' ? <Shield className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
+                            {emp.role === 'admin' ? 'Administrateur' : 'Employé'}
+                          </span>
+                        </td>
+                        <td className="p-4 align-middle text-muted-foreground">
+                          {emp.createdAt ? new Date(emp.createdAt).toLocaleDateString('fr-FR') : 'N/A'}
+                        </td>
+                        <td className="p-4 align-middle text-right">
+                          <button
+                            onClick={() => handleRoleChange(emp.id, emp.role)}
+                            disabled={emp.id === user?.uid}
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                            title={emp.id === user?.uid ? "Vous ne pouvez pas modifier votre propre rôle" : "Modifier le rôle"}
+                          >
+                            <Edit className="w-4 h-4" />
+                            {emp.role === 'admin' ? 'Rétrograder' : 'Promouvoir'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </CardContent>
       </Card>
     </div>
   );
 }
-

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { User, onAuthStateChanged } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase-auth";
-import { getUserRole } from "@/lib/firestore-helpers";
+import { getUserRole, ensureUserDoc } from "@/lib/firestore-helpers";
 import type { UserRole } from "@/lib/data-model";
 
 type AuthState = {
@@ -32,9 +32,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const r = await getUserRole(u.uid);
+        let r = await getUserRole(u.uid);
+        if (!r) {
+          // If no role or document, ensure it exists with default 'employe' role
+          await ensureUserDoc({
+            uid: u.uid,
+            nom: u.displayName || "Utilisateur",
+            email: u.email || "",
+            role: "employe",
+          });
+          r = "employe";
+        }
         setRole(r);
-      } catch {
+      } catch (error) {
+        console.error("Erreur lors de la récupération du rôle:", error);
         setRole(null);
       } finally {
         setLoading(false);

@@ -1,181 +1,189 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import dynamic from "next/dynamic";
 import { toast } from "sonner";
-import { httpsCallable } from "firebase/functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/components/providers/auth-provider";
-import { getFirebaseFunctions } from "@/lib/firebase-functions";
-import type { PointageType } from "@/lib/data-model";
-
-type Geo = { latitude: number; longitude: number };
-
-const Html5QrcodeScanner = dynamic(async () => (await import("@/components/app/qr-scanner")).QrScanner, {
-  ssr: false,
-});
-
-function getCurrentPosition(): Promise<Geo> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("Géolocalisation non supportée"));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-  });
-}
+import { ScannerQR } from "@/components/pointage/ScannerQR";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import { MapPin, CheckCircle2, AlertCircle } from "lucide-react";
+import { getFirebaseAuth } from "@/lib/firebase-auth";
 
 export default function PointagePage() {
   const { user } = useAuth();
-  const [geo, setGeo] = useState<Geo | null>(null);
-  const [qr, setQr] = useState<string>("");
-  const [scanning, setScanning] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const { coordinates, error: geoError, loading: geoLoading, getLocation } = useGeolocation();
+  
+  const [qrToken, setQrToken] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleGetGeo = useCallback(async () => {
-    try {
-      const g = await getCurrentPosition();
-      setGeo(g);
-      toast.success("Position récupérée");
-    } catch {
-      toast.error("Impossible de récupérer la géolocalisation");
+  const handleScanSuccess = useCallback((decodedText: string) => {
+    setQrToken(decodedText);
+    toast.success("QR Code scanné avec succès !");
+    // On déclenche automatiquement la récupération GPS si elle n'est pas déjà faite
+    if (!coordinates) {
+      getLocation();
     }
-  }, []);
+  }, [coordinates, getLocation]);
 
-  const handleQrDecoded = useCallback((text: string) => {
-    setQr(text);
-    toast.success("QR détecté");
-    setScanning(false);
-  }, []);
+  const handleSubmitPointage = async () => {
+    if (!qrToken) {
+      toast.error("Veuillez scanner le QR Code d'abord.");
+      return;
+    }
+    if (!coordinates) {
+      toast.error("Veuillez autoriser la géolocalisation.");
+      return;
+    }
 
-  const handleSave = useCallback(async () => {
-    if (!user) return;
-    setSaving(true);
+    setIsSubmitting(true);
     try {
-      const functions = getFirebaseFunctions();
-      if (!functions) {
-        toast.error("Firebase n'est pas configuré");
-        return;
+      const auth = getFirebaseAuth();
+      const idToken = await auth?.currentUser?.getIdToken();
+
+      if (!idToken) {
+        throw new Error("Session invalide.");
       }
 
-      const qrToken = process.env.NEXT_PUBLIC_POINTAGE_QR_TOKEN?.trim() ?? "";
-      if (!qrToken) {
-        toast.error("QR token manquant: définissez NEXT_PUBLIC_POINTAGE_QR_TOKEN dans .env.local");
-        return;
+      const res = await fetch("/api/pointage", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          qrToken,
+          lat: coordinates.lat,
+          lng: coordinates.lng,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur lors du pointage.");
       }
 
-      const scanned = qr.trim();
-      if (!scanned) {
-        toast.error("Scannez le QR code (ou collez le token) avant de pointer");
-        return;
-      }
-
-      const g = geo ?? (await getCurrentPosition().catch(() => null));
-      if (!g) {
-        toast.error("La géolocalisation est obligatoire pour pointer");
-        return;
-      }
-
-      const createPointage = httpsCallable(functions, "createPointage");
-      const res = await createPointage({ latitude: g.latitude, longitude: g.longitude, qr: scanned });
-      const payload = res.data as { type?: PointageType };
-
-      const type = payload.type;
-      toast.success(type === "sortie" ? "Pointage de sortie enregistré" : "Pointage d'entrée enregistré");
-      setQr("");
-      setScanning(false);
-    } catch (err) {
-      const anyErr = err as { code?: string; message?: string; details?: unknown };
-      const code = anyErr?.code;
-      const msg = typeof anyErr?.message === "string" ? anyErr.message : "";
-
-      if (code === "functions/unauthenticated") {
-        toast.error("Session expirée: reconnectez-vous");
-      } else if (
-        code === "functions/permission-denied" ||
-        msg.toLowerCase().includes("outside allowed area") ||
-        msg.toLowerCase().includes("invalid qr")
-      ) {
-        toast.error("Pointage refusé: zone ou QR invalide");
-      } else if (code === "functions/invalid-argument") {
-        toast.error("Données invalides");
-      } else if (code === "functions/failed-precondition") {
-        toast.error("Configuration serveur incomplète (token/zone).");
+      if (data.data.isRetard) {
+        toast.warning(`Pointage validé (${data.data.type}), mais marqué en retard.`);
       } else {
-        toast.error(msg || "Erreur lors du pointage");
+        toast.success(data.message);
       }
+      
+      // Réinitialiser pour le prochain pointage
+      setQrToken(null);
+      
+    } catch (err: any) {
+      toast.error(err.message || "Impossible d'enregistrer le pointage.");
     } finally {
-      setSaving(false);
+      setIsSubmitting(false);
     }
-  }, [geo, user, qr]);
+  };
 
   if (!user) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl mx-auto py-8">
       <div>
-        <h1 className="text-2xl font-bold">Pointage</h1>
-        <p className="text-muted-foreground">Géolocalisation + QR code, puis enregistrement du pointage.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Pointage Intelligent</h1>
+        <p className="text-muted-foreground mt-2">
+          Scannez le QR Code de la borne et validez votre position pour pointer.
+        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Étape 1 : QR Code */}
+        <Card className={qrToken ? "border-green-500/50 bg-green-500/5" : ""}>
           <CardHeader>
-            <CardTitle>1) Géolocalisation</CardTitle>
-            <CardDescription>Récupère votre position actuelle.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              1. Scan du QR Code
+              {qrToken && <CheckCircle2 className="text-green-500 w-5 h-5" />}
+            </CardTitle>
+            <CardDescription>
+              Scannez le QR Code affiché à l'entrée de l'entreprise.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <Button onClick={handleGetGeo} variant="outline">
-              Récupérer ma position
-            </Button>
-            <div className="text-sm text-muted-foreground">
-              {geo ? (
-                <div>
-                  Latitude: {geo.latitude.toFixed(6)} <br />
-                  Longitude: {geo.longitude.toFixed(6)}
-                </div>
-              ) : (
-                "Aucune position."
-              )}
-            </div>
+          <CardContent>
+            {!qrToken ? (
+              <ScannerQR onScanSuccess={handleScanSuccess} />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-6 bg-white dark:bg-zinc-900 rounded-xl border border-green-200 dark:border-green-900/30">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mb-2" />
+                <p className="font-medium text-green-600 dark:text-green-400">QR Code valide enregistré</p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="mt-4 text-muted-foreground"
+                  onClick={() => setQrToken(null)}
+                >
+                  Scanner à nouveau
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Étape 2 : GPS & Validation */}
+        <Card className={coordinates ? "border-blue-500/50 bg-blue-500/5" : ""}>
           <CardHeader>
-            <CardTitle>2) QR Code</CardTitle>
-            <CardDescription>Scannez le QR code de l’entreprise.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              2. Validation & GPS
+              {coordinates && <CheckCircle2 className="text-blue-500 w-5 h-5" />}
+            </CardTitle>
+            <CardDescription>
+              Votre position est requise pour confirmer que vous êtes sur site.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Button onClick={() => setScanning((s) => !s)} variant="outline">
-                {scanning ? "Arrêter le scan" : "Scanner"}
-              </Button>
-              <Button onClick={handleSave} disabled={saving} className="flex-1">
-                {saving ? "Enregistrement..." : "Pointer"}
-              </Button>
+          <CardContent className="space-y-6">
+            
+            {/* GPS Status */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <MapPin className={`w-5 h-5 ${coordinates ? "text-blue-500" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="font-medium text-sm">Position GPS</p>
+                  <p className="text-xs text-muted-foreground">
+                    {geoLoading ? "Recherche en cours..." : 
+                     coordinates ? `Précision: Haute` : "Non acquise"}
+                  </p>
+                </div>
+              </div>
+              {!coordinates && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={getLocation} 
+                  disabled={geoLoading}
+                >
+                  Obtenir
+                </Button>
+              )}
             </div>
 
-            {scanning ? (
-              <div className="rounded-md border p-3">
-                <Html5QrcodeScanner onDecoded={handleQrDecoded} />
+            {geoError && (
+              <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <p>{geoError}</p>
               </div>
-            ) : null}
+            )}
 
-            <Input value={qr} onChange={(e) => setQr(e.target.value)} placeholder="QR (auto après scan)" />
-            <p className="text-xs text-muted-foreground">
-              Le QR est validé côté serveur (Callable Function) avec le token configuré dans l’environnement.
-            </p>
+            {/* Action finale */}
+            <div className="pt-4 border-t">
+              <Button 
+                className="w-full h-12 text-lg" 
+                onClick={handleSubmitPointage}
+                disabled={!qrToken || !coordinates || isSubmitting}
+              >
+                {isSubmitting ? "Validation en cours..." : "Valider mon pointage"}
+              </Button>
+              <p className="text-center text-xs text-muted-foreground mt-3">
+                Vous devez valider les deux étapes pour pointer.
+              </p>
+            </div>
+
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
-
