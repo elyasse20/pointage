@@ -54,7 +54,7 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.dateDebut is string
         && request.resource.data.dateFin is string
-        && request.resource.data.type in ["annuel", "maladie", "exceptionnel"]
+        && request.resource.data.type in ["annuel", "maladie", "exceptionnel", "maternite", "paternite", "sans_solde", "recuperation"]
         && request.resource.data.statut == "en_attente"
         && request.resource.data.createdAt == request.time;
 

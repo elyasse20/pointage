@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getFirebaseAuth } from "@/lib/firebase-auth";
@@ -13,6 +14,7 @@ const items = [
   { href: "/admin/employes", label: "Employés" },
   { href: "/admin/conges", label: "Congés" },
   { href: "/admin/rapport-pointage", label: "Rapport pointage" },
+  { href: "/admin/qrcode", label: "QR Code" },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -34,6 +36,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex items-center gap-2">
             <div className="hidden text-sm text-muted-foreground md:block">{user?.email}</div>
+            <ThemeToggle />
             <Button variant="outline" onClick={handleLogout}>
               Se déconnecter
             </Button>

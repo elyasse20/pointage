@@ -22,9 +22,13 @@ enum PointageType {
 }
 
 enum CongeType {
-  annuel
-  maladie
-  exceptionnel
+  ANNUEL
+  MALADIE
+  EXCEPTIONNEL
+  MATERNITE
+  PATERNITE
+  SANS_SOLDE
+  RECUPERATION
 }
 
 enum CongeStatut {

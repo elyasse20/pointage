@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getFirebaseAuth } from "@/lib/firebase-auth";
@@ -65,14 +66,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="hidden text-sm text-muted-foreground md:block">
                   {user.displayName ?? user.email}
                 </div>
+                <ThemeToggle />
                 <Button variant="outline" onClick={handleLogout}>
                   Se déconnecter
                 </Button>
               </>
             ) : (
-              <Button asChild variant="outline">
-                <Link href="/login">Se connecter</Link>
-              </Button>
+              <>
+                <ThemeToggle />
+                <Button asChild variant="outline">
+                  <Link href="/login">Se connecter</Link>
+                </Button>
+              </>
             )}
           </div>
         </div>

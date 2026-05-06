@@ -17,7 +17,7 @@ import { Clock, CheckCircle2, XCircle, CalendarIcon } from "lucide-react";
 const schema = z.object({
   dateDebut: z.string().min(10, "Date début requise"),
   dateFin: z.string().min(10, "Date fin requise"),
-  type: z.enum(["annuel", "maladie", "exceptionnel"]),
+  type: z.enum(["annuel", "maladie", "exceptionnel", "maternite", "paternite", "sans_solde", "recuperation"]),
   motif: z.string().optional(),
 });
 
@@ -186,6 +186,10 @@ export default function CongesPage() {
                           <option value="annuel">Congé Annuel</option>
                           <option value="maladie">Congé Maladie</option>
                           <option value="exceptionnel">Congé Exceptionnel</option>
+                          <option value="maternite">Congé de Maternité</option>
+                          <option value="paternite">Congé de Paternité</option>
+                          <option value="sans_solde">Congé Sans Solde</option>
+                          <option value="recuperation">Congé de Récupération</option>
                         </select>
                       </FormControl>
                       <FormMessage />

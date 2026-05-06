@@ -30,11 +30,44 @@ export async function GET(req: Request) {
       .orderBy("createdAt", "desc")
       .get();
 
-    const conges = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate().toISOString(),
-    }));
+    // Enrichir chaque congé avec le nom depuis Firebase Auth (source fiable)
+    const conges = await Promise.all(
+      snapshot.docs.map(async (doc) => {
+        const data = doc.data();
+
+        let employeNom: string = data.employeNom || "";
+
+        // Priorité 1 : utiliser le nom déjà stocké dans le document
+        // Priorité 2 : Firebase Auth (toujours disponible — email garanti)
+        if (!employeNom) {
+          const uid = data.userId || data.uid || null;
+          if (uid) {
+            try {
+              const authUser = await adminAuth.getUser(uid);
+              employeNom = authUser.displayName || authUser.email || uid.slice(0, 8);
+            } catch {
+              // Priorité 3 : collection Firestore users
+              try {
+                const userDoc = await adminFirestore.collection("users").doc(uid).get();
+                if (userDoc.exists) {
+                  const d = userDoc.data()!;
+                  employeNom = d.nom || d.email || uid.slice(0, 8);
+                }
+              } catch {
+                employeNom = uid.slice(0, 8);
+              }
+            }
+          }
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          employeNom: employeNom || "Inconnu",
+          createdAt: data.createdAt?.toDate().toISOString(),
+        };
+      })
+    );
 
     return NextResponse.json({ success: true, data: conges });
   } catch (error) {
@@ -42,6 +75,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Erreur interne." }, { status: 500 });
   }
 }
+
 
 // PUT: Valider ou Refuser une demande
 export async function PUT(req: Request) {

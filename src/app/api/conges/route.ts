@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminFirestore } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 export async function GET(req: Request) {
   try {
@@ -48,19 +49,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Champs requis manquants." }, { status: 400 });
     }
 
-    // Récupérer le nom de l'utilisateur pour faciliter l'affichage admin
-    const userDoc = await adminFirestore.collection("users").doc(decodedAuth.uid).get();
-    const employeNom = userDoc.exists ? userDoc.data()?.nom : decodedAuth.name || decodedAuth.email;
+    // Récupérer le nom de l'employé depuis Firebase Auth (email garanti)
+    // puis depuis Firestore users, puis depuis le token décodé
+    let employeNom: string = "";
+    try {
+      const authUser = await adminAuth.getUser(decodedAuth.uid);
+      employeNom = authUser.displayName || authUser.email || "";
+    } catch {/* ignore */}
+
+    if (!employeNom) {
+      try {
+        const userDoc = await adminFirestore.collection("users").doc(decodedAuth.uid).get();
+        if (userDoc.exists) {
+          const d = userDoc.data()!;
+          employeNom = d.nom || d.email || "";
+        }
+      } catch {/* ignore */}
+    }
+
+    if (!employeNom) {
+      employeNom = decodedAuth.email || decodedAuth.name || decodedAuth.uid.slice(0, 8);
+    }
 
     const nouveauConge = {
       userId: decodedAuth.uid,
-      employeNom: employeNom,
+      employeNom,
       dateDebut,
       dateFin,
       type,
       motif: motif || "",
       statut: "en_attente",
-      createdAt: adminFirestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     };
 
     const docRef = await adminFirestore.collection("conges").add(nouveauConge);

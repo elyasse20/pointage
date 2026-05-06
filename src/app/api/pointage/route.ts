@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminAuth, adminFirestore } from "@/lib/firebase-admin";
 import jwt from "jsonwebtoken";
 import { differenceInMinutes, startOfDay, endOfDay } from "date-fns";
+import { FieldValue } from "firebase-admin/firestore";
 
 // Secret utilisé pour signer les QR Codes. Strictement privé côté serveur.
 const QR_SECRET = process.env.JWT_SECRET_KEY || "CHANGE_ME_JWT_SECRET_KEY";
@@ -84,10 +85,10 @@ export async function POST(req: Request) {
     // Récupérer le dernier pointage de l'employé aujourd'hui
     const pointagesRef = adminFirestore.collection("pointages");
     const snapshot = await pointagesRef
-      .where("employeId", "==", decodedAuth.uid)
-      .where("timestamp", ">=", todayStart)
-      .where("timestamp", "<=", todayEnd)
-      .orderBy("timestamp", "desc")
+      .where("userId", "==", decodedAuth.uid)
+      .where("createdAt", ">=", todayStart)
+      .where("createdAt", "<=", todayEnd)
+      .orderBy("createdAt", "desc")
       .limit(1)
       .get();
 
@@ -96,21 +97,19 @@ export async function POST(req: Request) {
 
     if (!snapshot.empty) {
       const lastPointage = snapshot.docs[0].data();
-      // S'il a déjà pointé une Entrée, le prochain pointage est une Sortie
-      if (lastPointage.type === "Entrée") {
-        type = "Sortie";
+      // S'il a déjà pointé une entrée, le prochain pointage est une sortie
+      if (lastPointage.type === "entree") {
+        type = "sortie";
       } else {
-        // S'il a déjà une sortie, on peut le laisser re-rentrer, etc.
-        type = "Entrée";
+        type = "entree";
       }
     } else {
-      // C'est le premier pointage de la journée : Entrée
+      // C'est le premier pointage de la journée : entree
       // Vérifions le retard (Exemple: heure prévue 09:00)
       const heurePrevue = new Date(now);
       heurePrevue.setHours(9, 0, 0, 0);
       
       if (now > heurePrevue) {
-        // Tolérance de 15 minutes par exemple
         const retardMinutes = differenceInMinutes(now, heurePrevue);
         if (retardMinutes > 15) {
           isRetard = true;
@@ -119,21 +118,29 @@ export async function POST(req: Request) {
     }
 
     // 5. Enregistrement dans Firestore
+    // Champs plats pour compatibilité avec le client SDK (pas de GeoPoint)
+    const dateStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const heureStr = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`; // HH:MM
     const nouveauPointage = {
-      employeId: decodedAuth.uid,
+      userId: decodedAuth.uid,
       nom: decodedAuth.name || decodedAuth.email || "Employé",
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      type: type,
-      location: new admin.firestore.GeoPoint(lat, lng),
+      date: dateStr,
+      heure: heureStr,
+      type: type,                    // "entree" | "sortie"
+      latitude: lat,
+      longitude: lng,
+      valide: !isRetard,
       status: isRetard ? "anomalie" : "valide",
       notes: isRetard ? "En retard" : "",
+      createdAt: FieldValue.serverTimestamp(),
     };
 
     const docRef = await pointagesRef.add(nouveauPointage);
 
+    const typeLabel = type === "entree" ? "Entrée" : "Sortie";
     return NextResponse.json({
       success: true,
-      message: `Pointage validé avec succès (${type}).`,
+      message: `Pointage validé avec succès (${typeLabel}).`,
       data: { id: docRef.id, type, isRetard }
     });
 
