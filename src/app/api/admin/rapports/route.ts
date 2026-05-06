@@ -43,15 +43,12 @@ export async function GET(req: Request) {
 
     let pointages = snapshot.docs.map((doc) => {
       const data = doc.data();
-      // On considère une entrée après 09:15 comme une anomalie (retard)
-      const isAnomaly = data.type === "entree" && data.heure > "09:15";
       
       return {
         id: doc.id,
         date: data.date as string,
         ...data,
         employeNom: usersMap[data.userId]?.nom || "Inconnu",
-        isAnomaly,
         createdAt: data.createdAt?.toDate().toISOString(),
       };
     });

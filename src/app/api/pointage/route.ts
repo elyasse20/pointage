@@ -92,7 +92,7 @@ export async function POST(req: Request) {
       .limit(1)
       .get();
 
-    let type = "Entrée";
+    let type = "entree";
     let isRetard = false;
 
     if (!snapshot.empty) {
