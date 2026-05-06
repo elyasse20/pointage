@@ -48,6 +48,7 @@ export async function GET(req: Request) {
       
       return {
         id: doc.id,
+        date: data.date as string,
         ...data,
         employeNom: usersMap[data.userId]?.nom || "Inconnu",
         isAnomaly,
